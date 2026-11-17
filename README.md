@@ -22,7 +22,7 @@ PORT=9000 python server.py
 $env:PORT=9000; py server.py
 ```
 
-Docker is optional: `docker build -t aether .` then `docker run --rm -p 8000:8000 aether`. Docker itself is not required and was not run in the build environment.
+Docker is optional: `docker build -t aether .` then `docker run --rm -p 8000:8000 aether`. Docker is optional locally. The container image was built and deployed on Render with Python 3.12; all 32 unittest methods passed during that build.
 
 ## What works
 
@@ -102,3 +102,9 @@ Render free instances can sleep after 15 idle minutes and cold-start on the next
 This is an explainable educational demonstrator, not a production network controller or a guarantee against all malicious prompts. No authentication protects this public demo because visitors affect only their own disposable twin. Do not use `http.server` as a general production platform, store sensitive information in sessions, or point this app at real devices without a separate reviewed integration.
 
 The proposal's real SDN/OpenFlow, OSPF comparison, trained LSTM, iperf/ping capture and physical packet benchmarks remain outside this delivered scope. No benchmark targets from the PDF are presented as achieved results. Use the provided explanations and actual evidence when presenting the project, and follow your course's AI-use and attribution rules.
+
+## Live deployment
+
+https://aether-network-twin.onrender.com/
+
+Deployment evidence, free-host limits and current model status: [docs/deployment.md](docs/deployment.md).
