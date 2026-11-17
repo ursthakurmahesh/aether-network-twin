@@ -11,3 +11,5 @@ Initial verified platform: Linux, Python 3.10, local Chromium. These are actual 
 Not verified: Windows/macOS execution, real packets, Ryu/Mininet/OpenFlow, trained LSTM, physical-network recovery and Google API availability at all future times. Docker image built and deployed on Render using Python 3.12, with all 32 unittest methods passing during the hosted build. Live deployment and current API verification are recorded in deployment.md.
 
 Reproduce with python -m unittest discover -s tests -v, python tests/evaluate.py and the optional Playwright browser_smoke.py.
+
+Public HTTPS smoke verification passed all nine checks with zero page errors on 17 November 2026 at 14:38 UTC, after correcting the fast-click UI race found by the first live run. See live-browser-smoke.json. The live Gemini request returned Google HTTP503 with no policy applied; see live-gemini-check.json.

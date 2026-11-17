@@ -7,7 +7,7 @@ Verified 17 November 2026, UTC.
 - Hosting: Render Free, Docker, Python 3.12. No payment method or paid instance selected.
 - Initial hosted Docker build passed all 32 unittest methods. Local Chromium checks passed nine workflow checks with zero page errors.
 - A live browser manually verified a proposal, explicit approval, revision increment and actual backend enforcement: video priority and blocked p2p delivery of zero.
-- Automated live QA exposed a fast-click race in the initial UI: approval could be clicked before the proposal request's refresh finished. Fixed by disabling approval until that operation completes. The final live test record is stored alongside this file after redeployment.
+- Automated live QA exposed a fast-click race in the initial UI: approval could be clicked before the proposal request's refresh finished. Fixed by disabling approval until that operation completes. After redeployment, all nine automated Chromium workflows passed against the public HTTPS app with zero page errors. See live-browser-smoke.json.
 
 ## Model and safety limits
 
@@ -15,7 +15,7 @@ The network is a synthetic, isolated digital twin. No physical switches, Mininet
 
 The forecast-aware heuristic underperformed reactive-only routing in the included high-demand synthetic failure comparison. See MODEL.md and model-evaluation.json for the exact workload and results. No general performance gain is claimed.
 
-Gemini was used for architecture and code review during development. Claude access did not produce a usable response. The app's optional Gemini adapter uses a server-only key, a free-tier confirmation gate and bounded quotas. Early generation requests to current free Google models returned HTTP503; offline mode remains fully functional and is explicitly labeled as a non-LLM compiler. Server configuration does not prove provider availability.
+Gemini was used for architecture and code review during development. Claude access did not produce a usable response. The app's optional Gemini adapter uses a server-only key, a free-tier confirmation gate and bounded quotas. The server-side key and free-tier gate were configured on Render through the secret manager. A generation request through the actual deployed backend returned HTTP503 from Google at 14:38 UTC, so successful live Gemini translation is not claimed. See live-gemini-check.json. Earlier generation requests also returned HTTP503; offline mode remains fully functional and is explicitly labeled as a non-LLM compiler. Server configuration does not prove provider availability.
 
 ## Free hosting limits
 

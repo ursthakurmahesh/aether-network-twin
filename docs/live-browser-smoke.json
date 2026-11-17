@@ -1,0 +1,17 @@
+{
+  "base_url": "https://aether-network-twin.onrender.com",
+  "browser": "Chromium",
+  "checks": [
+    "dashboard render",
+    "policy preview/approval",
+    "registry update",
+    "link fault confirmation",
+    "flow explorer",
+    "snapshot rollback",
+    "unsafe rejection",
+    "visitor isolation",
+    "mobile no-overflow"
+  ],
+  "page_errors": [],
+  "verified_at_utc": "2026-11-17T14:38:23Z"
+}
