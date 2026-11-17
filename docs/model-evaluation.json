@@ -1,0 +1,65 @@
+{
+  "provenance": "Executed deterministic mathematical model, synthetic sinusoidal workload. Not real networking performance. No OSPF/LSTM claims.",
+  "steps_per_trial": 30,
+  "trials": 10,
+  "modes": {
+    "static_model": {
+      "mean_throughput": {
+        "mean": 39.9778,
+        "stdev": 0.0368
+      },
+      "mean_loss_pct": {
+        "mean": 74.4719,
+        "stdev": 0.0355
+      },
+      "mean_rtt_estimate": {
+        "mean": 22.5555,
+        "stdev": 0.0158
+      }
+    },
+    "reactive_model": {
+      "mean_throughput": {
+        "mean": 79.9778,
+        "stdev": 0.0368
+      },
+      "mean_loss_pct": {
+        "mean": 48.9295,
+        "stdev": 0.0769
+      },
+      "mean_rtt_estimate": {
+        "mean": 26.2083,
+        "stdev": 0.0059
+      }
+    },
+    "forecast_aware_model": {
+      "mean_throughput": {
+        "mean": 61.7467,
+        "stdev": 7.5111
+      },
+      "mean_loss_pct": {
+        "mean": 60.5679,
+        "stdev": 4.7758
+      },
+      "mean_rtt_estimate": {
+        "mean": 27.2071,
+        "stdev": 0.7193
+      }
+    }
+  },
+  "forecast_evaluation": {
+    "source": "synthetic analytical utilization series, not trained on real traffic",
+    "split": "first 150 train reference, next 60 validation reference, final 90 held-out test; fixed baselines require no fitting",
+    "lead_steps": 5,
+    "samples": 85,
+    "metrics": {
+      "moving_average": {
+        "MAE": 0.124603,
+        "RMSE": 0.159659
+      },
+      "moving_average_trend": {
+        "MAE": 0.092096,
+        "RMSE": 0.109868
+      }
+    }
+  }
+}
