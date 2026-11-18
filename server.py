@@ -69,6 +69,13 @@ def gemini_translate(text,session):
     if DANGER.search(text):raise Problem('Unsafe instruction or management target rejected before model access.')
     bundle=gemini_generate(text,session,model=FINDINGS_MODEL)
     if not bundle.get('rules'):raise Problem('The model needs a clearer target or threshold. Nothing was applied.')
+    # Flash-Lite often fills unused optional fields. Drop only empty/irrelevant ones; the strict validator still checks the rest.
+    for r in bundle['rules']:
+        if type(r) is not dict:continue
+        for k in [k for k,v in r.items() if v is None or v=='' or v==[]]:r.pop(k)
+        if r.get('action') not in ('rate_limit','latency'):r.pop('value',None)
+        if r.get('action')!='reroute':r.pop('via',None);r.pop('avoid',None)
+        if r.get('port')==0:r.pop('port')
     return validate_schema(bundle)
 
 def get_session(cookie):
