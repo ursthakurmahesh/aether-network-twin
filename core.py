@@ -162,7 +162,7 @@ def parse_removal(text,rules):
         if hosts and r['src'] not in hosts and r['dst'] not in hosts:continue
         if len(hosts)>1 and not (r['src']==hosts[0] and r['dst']==hosts[1]):continue
         out.append(i)
-    if not out:raise Problem('No approved rule matches that. Open Policy registry to see current rules. Nothing was changed.')
+    if not out:raise Problem('No approved rule matches that. Open Policy registry to see current rules. Nothing was changed.',404)
     return out
 
 class Twin:
