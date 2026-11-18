@@ -1,3 +1,4 @@
+from lab_assistant import context as lab_context, prepare_request as lab_question, validate_result as lab_checked, PROMPT as LAB_PROMPT, SCHEMA as LAB_SCHEMA
 from findings import prepare as prepare_findings, checked as check_findings, PROMPT as FINDING_PROMPT, SCHEMA as FINDING_SCHEMA
 from diagnostics import check_dns, LookupProblem
 import urllib.parse
@@ -116,16 +117,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(check_dns(params['name'][0]))
             except LookupProblem as error:
                 return self.reply({'error':str(error)},error.status)
-        assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/troubleshoot':'capture.html','/capture-core.js':'capture-core.js','/capture-ui.js':'capture-ui.js','/capture.css':'capture.css','/findings-ui.js':'findings-ui.js'}
+        assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/troubleshoot':'capture.html','/capture-core.js':'capture-core.js','/capture-ui.js':'capture-ui.js','/capture.css':'capture.css','/findings-ui.js':'findings-ui.js','/lab-assistant.js':'lab-assistant.js'}
         if path in assets:
             name=assets[path];suffix=Path(name).suffix
             mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[suffix]
             return self.reply((ROOT/'static'/name).read_bytes(),mime=mime)
-        if path not in ('/api/state','/api/export','/metrics'):return self.reply({'error':'Not found'},404)
+        if path not in ('/api/state','/api/export','/metrics','/api/lab-context'):return self.reply({'error':'Not found'},404)
         sid,s,fresh=get_session(self.headers.get('Cookie'));t=s['twin']
         secure='; Secure' if self.headers.get('X-Forwarded-Proto')=='https' else ''
         cookie='aether_session='+sid+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=1800'+secure
         with t.lock:
+            if path=='/api/lab-context':
+                s['lab_snapshot']=lab_context(t);s['lab_snapshot_at']=time.time();s['lab_snapshot_twin']=t
+                return self.reply(s['lab_snapshot'],cookie=cookie)
             if path=='/metrics':
                 text='# AETHER metrics are modeled, not measured from packets. Visitor-scoped.\n'+'\n'.join('aether_model_'+k+' '+str(v) for k,v in t.metrics().items())+'\n'
                 return self.reply(text.encode(),mime='text/plain; charset=utf-8',cookie=cookie)
@@ -153,7 +157,19 @@ class Handler(BaseHTTPRequestHandler):
                 if len(q)>=40 or len(GLOBAL_LIMIT)>=400:raise Problem('Request limit reached. Wait a minute.',429)
                 q.append(now);GLOBAL_LIMIT.append(now)
             t=s['twin'];action=self.path.removeprefix('/api/')
-            if action=='findings':
+            if action=='lab-assistant':
+                question=lab_question(p)
+                if not s['busy'].acquire(blocking=False):raise Problem('A Gemini request is already being prepared.',409)
+                try:
+                    with t.lock:
+                        if p['revision']!=t.rev:raise Problem('The lab changed. Review a fresh snapshot before asking.',409)
+                        if s.get('lab_snapshot_twin') is not t or s.get('lab_snapshot',{}).get('revision')!=t.rev or time.time()-s.get('lab_snapshot_at',0)>120:raise Problem('Reviewed snapshot expired or changed. Review a fresh lab snapshot.',409)
+                        brief=json.loads(json.dumps(s['lab_snapshot']))
+                    brief['question']=question
+                    analysis=lab_checked(gemini_generate(json.dumps(brief),s,LAB_PROMPT,LAB_SCHEMA,FINDINGS_MODEL),brief)
+                    result={'analysis':analysis,'snapshot':brief,'model':FINDINGS_MODEL,'provider':'Google Gemini','generated_at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'notice':'Synthetic snapshot explanation, not a real-network diagnosis. Citations check IDs, not truth. Suggestions do not apply policies.'}
+                finally:s['busy'].release()
+            elif action=='findings':
                 brief=prepare_findings(p)
                 if not s['busy'].acquire(blocking=False):raise Problem('An explanation is already being prepared.',409)
                 try:
