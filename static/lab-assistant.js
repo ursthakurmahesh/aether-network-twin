@@ -6,7 +6,7 @@ function status(s){el('lab-status').textContent=s;}
 function enabled(){el('lab-ask').disabled=asking||reviewing||!reviewed||!el('lab-consent').checked;el('lab-review').disabled=asking||reviewing;el('lab-download').disabled=!receipt;}
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function snapshotLabel(b){return 'Revision '+b.revision+', model step '+b.tick;}
-el('lab-review').onclick=async()=>{if(asking||reviewing)return;reviewing=true;reviewed=null;el('lab-consent').checked=false;enabled();status('Loading a fresh server snapshot...');try{reviewed=await api('lab-context');el('lab-context').textContent=JSON.stringify(reviewed,null,2);el('lab-consent').checked=false;status('Reviewed '+snapshotLabel(reviewed)+'. Snapshot expires after two minutes. Review again after any configuration change.');}catch(e){reviewed=null;status(e.message);}finally{reviewing=false;enabled();}};
+el('lab-review').onclick=async()=>{if(asking||reviewing)return;if(!state?.csrf){status('The lab is still connecting. Wait for Live backend, then review again.');return;}reviewing=true;reviewed=null;el('lab-consent').checked=false;enabled();status('Loading a fresh server snapshot...');try{reviewed=await api('lab-context');el('lab-context').textContent=JSON.stringify(reviewed,null,2);el('lab-consent').checked=false;status('Reviewed '+snapshotLabel(reviewed)+'. Snapshot expires after two minutes. Review again after any configuration change.');}catch(e){reviewed=null;status(e.message);}finally{reviewing=false;enabled();}};
 el('lab-consent').onchange=enabled;
 el('lab-ask').onclick=async()=>{
  if(!reviewed||!el('lab-consent').checked||asking)return;
