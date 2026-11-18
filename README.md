@@ -169,3 +169,7 @@ Uses the same server-side Gemini key, free-tier gate, daily counter, per-session
 Design research: EvidenceLoop / Protocol SIFT Agent, https://github.com/irinaford/protocol-sift-agent . Evidence-grounded LLM reporting already exists; this integration is not claimed as a new invention. No code from that project was copied, no framework dependency added. Existing Ben Foxall MIT header-reader credit remains unchanged.
 
 Findings model: pinned `gemini-3.5-flash-lite` with documented minimal thinking. Direct verified response on 18 November 2026 took 1.5 seconds after 3.8 Flash repeatedly returned HTTP503/timeouts. This is an explicit implementation choice, not a runtime fallback or a Pro claim. Lab translation retains its separately configured model. Official free-tier pricing: https://ai.google.dev/gemini-api/docs/pricing .
+
+## Command center: Gemini and one-rule removal
+
+The Command center translator defaults to Google Gemini (free tier, server-side) when the server has it enabled, with the offline compiler as a choice. Typing `unblock video`, `remove block p2p` or `remove rule 2` previews removal of only the matching approved rules. Nothing is removed until you approve. Other policies, link states and settings are untouched, and a snapshot is saved first. The Policy registry also has a "Preview removal" button per rule. With Gemini selected, an unclear removal request is matched against the numbered rule list by Gemini, whose answer is checked against that list.
