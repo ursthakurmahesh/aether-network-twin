@@ -128,6 +128,43 @@ def parse_offline(text):
         rules.append(r)
     return validate_schema({'rules':rules})
 
+REMOVE_WORDS=re.compile(r'^\s*(unblock|un-block|remove|undo|lift|revoke|cancel|stop|unlimit|unprioriti[sz]e|clear)\b',re.I)
+def is_removal(text):return type(text) is str and bool(REMOVE_WORDS.match(text))
+def parse_removal(text,rules):
+    """Deterministic removal: returns indexes of existing approved rules. Never invents or edits rules."""
+    if type(text) is not str or not 1<=len(text.strip())<=1000:raise Problem('Write an intent between 1 and 1000 characters.')
+    if DANGER.search(text):raise Problem('Intent rejected: management targets, commands and instruction overrides are not accepted.')
+    c=text.lower().strip().rstrip('.')
+    m=re.search(r'\brules?\s+(\d+(?:\s*(?:,|and)\s*\d+)*)\b',c)
+    if m:
+        nums=[int(n) for n in re.findall(r'\d+',m.group(1))]
+        if any(not 1<=n<=len(rules) for n in nums):raise Problem('No such rule number. Open Policy registry to see rule numbers. Nothing was changed.')
+        return [n-1 for n in nums]
+    verb=re.match(r'^\s*(unblock|un-block|remove|undo|lift|revoke|cancel|stop|unlimit|unprioriti[sz]e|clear)\b',c).group(1)
+    rest=c[len(c)-len(c.lstrip()):] if False else re.sub(r'^\s*'+verb,'',c).strip()
+    action={'unblock':'block','un-block':'block','unlimit':'rate_limit','unprioritize':'prioritize','unprioritise':'prioritize'}.get(verb)
+    for a,words in (('block',r'\b(block|blocking|blocked|deny|drop)\b'),('rate_limit',r'\b(limit|cap|throttle|rate)\b'),('prioritize',r'\b(prioriti[sz]e|prioriti[sz]ing|priority)\b'),('reroute',r'\b(reroute|route)\b'),('latency',r'\blatency\b'),('allow',r'\b(allow|permit)\b')):
+        if re.search(words,rest):action=a
+    hosts=re.findall(r'\bh\d+\b',rest)
+    if any(h not in HOSTS for h in hosts):raise Problem('Unknown host. Use h1 through h8.')
+    names=[k for k in APPS if re.search(r'\b'+k+r'\b',rest)]
+    if re.search(r'voice|voip|sip',rest):names=['voice']
+    if re.search(r'video|calls',rest) and not names:names=['video']
+    if re.search(r'bittorrent|peer.to.peer|p2p',rest):names=['p2p']
+    if re.search(r'\bweb\b|https',rest):names=['web']
+    if len(names)>1:raise Problem('Name one application per removal, for example: unblock video. Nothing was changed.')
+    if not action and verb in ('remove','undo','cancel','stop','lift','revoke','clear'):raise Problem('Say which kind of rule to remove, for example: unblock video, or remove rule 2. Nothing was changed.')
+    if not hosts and not names:raise Problem('Name a host or application, for example: unblock video, or remove rule 2. Nothing was changed.')
+    out=[]
+    for i,r in enumerate(rules):
+        if action and r['action']!=action:continue
+        if names and r['app']!=names[0]:continue
+        if hosts and r['src'] not in hosts and r['dst'] not in hosts:continue
+        if len(hosts)>1 and not (r['src']==hosts[0] and r['dst']==hosts[1]):continue
+        out.append(i)
+    if not out:raise Problem('No approved rule matches that. Open Policy registry to see current rules. Nothing was changed.')
+    return out
+
 class Twin:
     def __init__(self):
         self.lock=threading.RLock();self.links=topology();self.rules=[];self.rev=0;self.tick=0;self.proactive=False;self.autoheal=True;self.surge=1.;self.history=deque(maxlen=60);self.audit=deque(maxlen=100);self.samples=deque(maxlen=120);self.link_history={e:deque(maxlen=20) for e in self.links};self.proposals={};self.receipts={};self.flows=[];self._last_paths={};self._last_reroute={};self._routing_rev=-1;self.last_seen=time.time();self._event('system','Twin initialized','Six switches, eight hosts. All traffic is synthetic.');self.step(0)
@@ -164,15 +201,26 @@ class Twin:
         if len(self.proposals)>=16:self.proposals.pop(next(iter(self.proposals)))
         p=dict(id=token,revision=self.rev,created=time.time(),intent=text,rules=b['rules'],source=source,checks=['Strict schema','Management protection','Overlap conflicts','Route feasibility','Digital-twin dry run'],preview=preview)
         self.proposals[token]=copy.deepcopy(p);self._event('validation','Policy validated',f'{len(b["rules"])} rule(s) staged; explicit approval required.');return p
-    def preview(self,rules):
-        other=Twin();other.links=copy.deepcopy(self.links);other.rules=copy.deepcopy(self.rules+rules);other.tick=self.tick;other.surge=self.surge;other.proactive=self.proactive;other.autoheal=self.autoheal;other.step(0)
-        return dict(before=self.metrics(),after=other.metrics(),affected=[f['id'] for f in other.flows if any(selector_matches(r,f) for r in rules)])
+    def propose_removal(self,indexes,text,source):
+        idx=sorted(set(indexes))
+        if not idx or len(idx)>12 or any(type(i) is not int or not 0<=i<len(self.rules) for i in idx):raise Problem('No matching approved rule to remove. Nothing was changed.')
+        token=secrets.token_urlsafe(18);removed=[copy.deepcopy(self.rules[i]) for i in idx];preview=self.preview([],idx)
+        if len(self.proposals)>=16:self.proposals.pop(next(iter(self.proposals)))
+        p=dict(id=token,revision=self.rev,created=time.time(),intent=text,rules=[],remove=idx,removed=removed,source=source,checks=['Only the listed approved rules are removed','Other policies, link states and settings are untouched','Remaining rules re-validated','Digital-twin dry run'],preview=preview)
+        self.proposals[token]=copy.deepcopy(p);self._event('validation','Rule removal validated',f'{len(idx)} rule(s) staged for removal; explicit approval required.');return p
+    def preview(self,rules,remove=()):
+        other=Twin();other.links=copy.deepcopy(self.links);other.rules=copy.deepcopy([r for i,r in enumerate(self.rules) if i not in set(remove)]+rules);other.tick=self.tick;other.surge=self.surge;other.proactive=self.proactive;other.autoheal=self.autoheal;other.step(0)
+        return dict(before=self.metrics(),after=other.metrics(),affected=[f['id'] for f in other.flows if any(selector_matches(r,f) for r in rules+[self.rules[i] for i in remove])])
     def apply(self,pid,revision):
         if pid in self.receipts:return self.receipts[pid]
         p=self.proposals.get(pid)
         if not p:raise Problem('Proposal not found. Prepare it again.',404)
         if time.time()-p['created']>600:raise Problem('Proposal expired. Prepare it again.',409)
         if type(revision) is not int or revision!=self.rev or p['revision']!=self.rev:raise Problem('The twin changed after preview. Re-validate the intent before approving.',409)
+        if p.get('remove'):
+            idx=set(p['remove']);keep=[r for i,r in enumerate(self.rules) if i not in idx]
+            if [self.rules[i] for i in sorted(idx)]!=p['removed']:raise Problem('The rules changed after preview. Re-validate before approving.',409)
+            self.checkpoint('Before '+p['intent'][:70]);self.rules=keep;self.rev+=1;self._last_paths={};self.step(0);receipt=dict(applied=True,revision=self.rev,proposal_id=pid,removed=len(idx));self.receipts[pid]=receipt;self._event('policy','Rule(s) removed',p['intent'][:200]);return receipt
         self.check({'rules':p['rules']});self.checkpoint('Before '+p['intent'][:70]);self.rules+=copy.deepcopy(p['rules']);self.rev+=1;self._last_paths={};self.step(0);receipt=dict(applied=True,revision=self.rev,proposal_id=pid);self.receipts[pid]=receipt
         if len(self.receipts)>64:self.receipts.pop(next(iter(self.receipts)))
         self._event('policy','Policy deployed',p['intent'][:200]);return receipt
