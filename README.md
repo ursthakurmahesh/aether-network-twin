@@ -1,5 +1,16 @@
 # AETHER
 
+## Gemini assistant inside the simulation lab
+
+Choose **Gemini lab assistant** in the lab navigation. Review the exact synthetic snapshot, consent to sending it to Google, then ask about traffic, recorded route changes or a policy experiment. Google may use free-tier input to improve its products. Snapshot review expires after two minutes or a configuration change. The answer retains the reviewed revision/model step while the simulation continues. Download its JSON receipt for evidence.
+
+The server selects only generated flow/link metrics, validated policy rules and strictly filtered route/fault events. It excludes credentials, user intent text, free-text audit notes and capture data. Metrics use Mbps, milliseconds and explicitly labeled fractions/percentages. Evidence references validate an ID exists, not that an AI explanation is true. The assistant can be wrong; recorded route transitions do not prove root cause.
+
+Policy suggestions select only locally validated candidate intents. **Fill intent box** only copies that local intent to the offline compiler. You must still **Validate & preview**, inspect the trade-offs, and explicitly **Approve**. Gemini cannot call any apply, fault, reset, settings or rollback operation. This is a mathematical twin, not real network control.
+
+The assistant shares the existing server-side free-tier Gemini path (`gemini-3.5-flash-lite`), eight-request visitor allowance, shared daily cap, two-call concurrency limit and bounded timeout. No paid or alternate-model fallback. Provider/quota failures show an error; offline controls still work. This is three guided question types, not unrestricted chat or autonomous diagnosis.
+
+
 ## New: practical troubleshooting tools (18 November 2026)
 
 Open **/troubleshoot** on the running app, or choose **Real capture & DNS tools** in the dashboard.
