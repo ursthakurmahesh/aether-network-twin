@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s);let state=null,proposal=null,selectedLink=n
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=(x,d=1)=>Number(x||0).toFixed(d);
 const positions={s1:[340,95],s2:[570,95],s3:[150,260],s4:[350,260],s5:[550,260],s6:[750,260],h1:[100,385],h2:[200,385],h3:[300,385],h4:[400,385],h5:[500,385],h6:[600,385],h7:[700,385],h8:[800,385]};
-const titles={overview:'Command center',flows:'Traffic explorer',policies:'Policy registry',history:'Change history',learn:'Architecture & guide'};
+const titles={assistant:'Gemini lab assistant',overview:'Command center',flows:'Traffic explorer',policies:'Policy registry',history:'Change history',learn:'Architecture & guide'};
 function showError(message){$('#error').textContent=message;$('#error').classList.remove('hidden');}
 function clearError(){$('#error').classList.add('hidden');}
 function toast(message){$('#toast').textContent=message;$('#toast').classList.remove('hidden');setTimeout(()=>$('#toast').classList.add('hidden'),4500);}
