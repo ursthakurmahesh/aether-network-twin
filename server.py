@@ -1,3 +1,5 @@
+from diagnostics import check_dns, LookupProblem
+import urllib.parse
 """Local-first HTTP application. Start: python server.py. No third-party dependencies."""
 import collections, concurrent.futures, hashlib, http.cookies, json, os, secrets, sqlite3, threading, time, urllib.request, urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -89,8 +91,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path=self.path.split('?')[0]
         if path=='/health':return self.reply({'ok':True,'version':'1.0.0','mode':'digital_twin'})
-        if path in ('/','/app.js','/style.css'):
-            name={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}[path];mime={'/':'text/html; charset=utf-8','/app.js':'text/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'}[path]
+        if path=='/api/dns-check':
+            try:
+                params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query,keep_blank_values=True)
+                if set(params)!={'name'} or len(params['name'])!=1:
+                    raise LookupProblem('Provide exactly one name parameter.')
+                return self.reply(check_dns(params['name'][0]))
+            except LookupProblem as error:
+                return self.reply({'error':str(error)},error.status)
+        assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css','/troubleshoot':'capture.html','/capture-core.js':'capture-core.js','/capture-ui.js':'capture-ui.js','/capture.css':'capture.css'}
+        if path in assets:
+            name=assets[path];suffix=Path(name).suffix
+            mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'}[suffix]
             return self.reply((ROOT/'static'/name).read_bytes(),mime=mime)
         if path not in ('/api/state','/api/export','/metrics'):return self.reply({'error':'Not found'},404)
         sid,s,fresh=get_session(self.headers.get('Cookie'));t=s['twin']
