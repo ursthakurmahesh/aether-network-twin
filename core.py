@@ -167,7 +167,7 @@ def parse_removal(text,rules):
 
 class Twin:
     def __init__(self):
-        self.lock=threading.RLock();self.links=topology();self.rules=[];self.rev=0;self.tick=0;self.proactive=False;self.autoheal=True;self.surge=1.;self.history=deque(maxlen=60);self.audit=deque(maxlen=100);self.samples=deque(maxlen=120);self.link_history={e:deque(maxlen=20) for e in self.links};self.proposals={};self.receipts={};self.flows=[];self._last_paths={};self._last_reroute={};self._routing_rev=-1;self.last_seen=time.time();self._event('system','Twin initialized','Six switches, eight hosts. All traffic is synthetic.');self.step(0)
+        self.lock=threading.RLock();self.links=topology();self.rules=[];self.rev=0;self.tick=0;self.proactive=False;self.autoheal=True;self.surge=1.;self.history=deque(maxlen=60);self.audit=deque(maxlen=100);self.samples=deque(maxlen=120);self.link_history={e:deque(maxlen=20) for e in self.links};self.proposals={};self.receipts={};self.flows=[];self._last_paths={};self._last_reroute={};self._routing_rev=-1;self.incidents=deque(maxlen=12);self.last_seen=time.time();self._event('system','Twin initialized','Six switches, eight hosts. All traffic is synthetic.');self.step(0)
     def _event(self,kind,title,detail,**kw):self.audit.appendleft(dict(id=secrets.token_hex(6),at=time.time(),tick=self.tick,kind=kind,title=title,detail=detail,**kw))
     def config(self):return copy.deepcopy(dict(rules=self.rules,links={k:{f:e[f] for f in ('up','capacity','delay')} for k,e in self.links.items()},autoheal=self.autoheal,proactive=self.proactive,surge=self.surge))
     def checkpoint(self,label):
@@ -236,6 +236,8 @@ class Twin:
         if action=='link':
             eid=payload.get('id');up=payload.get('up')
             if eid not in self.links or type(up) is not bool:raise Problem('Choose a known link and boolean up state.')
+            if self.links[eid]['up']==up:return {'revision':self.rev}
+            before=copy.deepcopy(self.flows);before_metrics=self.metrics()
             self.checkpoint('Before link '+eid);self.links[eid]['up']=up;self._event('fault' if not up else 'restore','Link '+('restored' if up else 'failed'),eid)
         elif action=='settings':
             if set(payload)-{'revision','autoheal','proactive','surge'}:raise Problem('Unknown setting.')
@@ -247,7 +249,23 @@ class Twin:
                 if k in payload:setattr(self,k,payload[k])
             self._event('system','Control settings updated','All changes affect only this visitor digital twin.')
         else:raise Problem('Unknown operation.')
-        self.rev+=1;self.step(0);return {'revision':self.rev}
+        self.rev+=1
+        if action=='link' and not up:
+            # Same topology, policies, demand tick and scheduler, but frozen pre-fault routes.
+            baseline=Twin();baseline.links=copy.deepcopy(self.links);baseline.rules=copy.deepcopy(self.rules)
+            baseline.tick=self.tick;baseline.surge=self.surge;baseline.autoheal=False;baseline.proactive=False
+            baseline._last_paths={f['id']:copy.deepcopy(f['path']) for f in before};baseline.step(0)
+        self.step(0)
+        if action=='link':
+            affected=[f for f in before if not f['blocked'] and eid in pairs(f['path'])]
+            report=dict(id=secrets.token_hex(6),link=eid,operation='restore' if up else 'fail',tick=self.tick,revision=self.rev,
+                        autoheal=self.autoheal,before=before_metrics,after=self.metrics(),
+                        without_healing=baseline.metrics() if not up else None,
+                        flows=[dict(id=f['id'],app=f['app'],before_path=f['path'],before_delivered=f['delivered'],
+                                    after_path=self.flows[i]['path'],after_delivered=self.flows[i]['delivered'],
+                                    status=self.flows[i]['route_status']) for i,f in enumerate(before) if f in affected])
+            self.incidents.appendleft(report)
+        return {'revision':self.rev}
     def step(self,dt=1):
         self.tick+=dt
         for e in self.links.values():e['load']=0.
@@ -255,16 +273,19 @@ class Twin:
         for i,(src,dst,app,base) in enumerate([('h1','h5','video',12),('h2','h6','web',18),('h3','h7','voice',4),('h4','h5','p2p',16),('h6','h2','web',14),('h7','h3','dns',2),('h5','h1','web',10),('h8','h1','web',3)]):
             protocol,port=APPS[app];demand=base*self.surge*(1+0.15*math.sin(self.tick/8+i));f=dict(id=f'f{i+1}',src=src,dst=dst,app=app,protocol=protocol,port=port,demand=round(demand,3));rr=[r for r in self.rules if selector_matches(r,f)];blocked=any(r['action']=='block' for r in rr);cap=min([r['value'] for r in rr if r['action']=='rate_limit']+[demand]);f.update(blocked=blocked,priority=any(r['action']=='prioritize' for r in rr),offered=0 if blocked else min(demand,cap),shaped=0 if blocked else max(0,demand-cap),max_latency=min([r['value'] for r in rr if r['action']=='latency']+[1000]))
             old=self._last_paths.get(f['id']);route=self.route(f)
-            if old and not self.autoheal and not self.proactive:route=old
+            known=f['id'] in self._last_paths
             old_valid=bool(old) and all(self.links[k]['up'] for k in pairs(old))
+            # An empty path is a known outage, not an uninitialized flow.
+            # Forecast optimization must not override the reactive-healing switch.
+            if known and not self.autoheal and (not old_valid or not self.proactive):route=old
             latency_rules=[r for r in rr if r['action']=='latency']
             if old_valid and route!=old and self._routing_rev==self.rev and (self.proactive or latency_rules):
                 def cost(path):return sum(self.links[k]['delay']+(20*max(self.links[k]['forecast'],self.links[k]['utilization'])**3 if self.proactive else 0)+(0.2*self.links[k]['utilization']/max(.05,1-self.links[k]['utilization']) if latency_rules else 0) for k in pairs(path))
                 violated=latency_rules and sum(self.links[k]['delay']+0.2*self.links[k]['utilization']/max(.05,1-self.links[k]['utilization']) for k in pairs(old))*2>f['max_latency']
                 if not violated and (self.tick-self._last_reroute.get(f['id'],-999)<5 or cost(route)>=cost(old)*.85):route=old
-            if old and old!=route and (self.autoheal or self.proactive):
+            if known and old!=route and not blocked:
                 self._last_reroute[f['id']]=self.tick
-                self._event('healing','Path recomputed',f'{f["id"]}: '+ ' → '.join(old)+' to '+' → '.join(route or ['unreachable']),mode='proactive' if self.proactive and old_valid else 'latency' if latency_rules and old_valid else 'reactive')
+                self._event('healing' if route else 'fault','Path recomputed' if route else 'No alternate path',f'{f["id"]}: '+ ' → '.join(old or ['unreachable'])+' to '+' → '.join(route or ['unreachable']),mode='proactive' if self.proactive and old_valid else 'latency' if latency_rules and old_valid else 'reactive')
             f['path']=route;rows.append(f)
         self._routing_rev=self.rev
         # Aggregate policer budgets apply across every flow matched by each rate-limit rule.
@@ -288,6 +309,8 @@ class Twin:
         for f in rows:
             if f['blocked'] or not f['path'] or any(not self.links[k]['up'] for k in pairs(f['path'])):f['latency']=None
             else:f['latency']=round(sum(self.links[k]['delay']+0.2*self.links[k]['utilization']/max(0.05,1-self.links[k]['utilization']) for k in pairs(f['path']))*2,3)
+            valid=bool(f['path']) and all(self.links[k]['up'] for k in pairs(f['path']))
+            f['route_status']='blocked_by_policy' if f['blocked'] else 'healing_disabled' if not valid and not self.autoheal else 'unreachable' if not valid else 'capacity_limited' if f['dropped']>0.001 else 'delivering'
             f['loss_pct']=round(100*f['dropped']/max(f['offered'],0.001),2);f['sla_met']=f['latency'] is not None and f['latency']<=f['max_latency'];f['jitter_estimate']=round((f['latency'] or 0)*0.03,3)
         self.flows=rows
         if dt:self.samples.append(dict(tick=self.tick,**self.metrics()))
@@ -296,4 +319,4 @@ class Twin:
         return dict(throughput=round(delivered,3),offered=round(offered,3),loss=round(100*(offered-delivered)/max(offered,0.001),3),latency=round(sum(lat)/len(lat),3) if lat else 0,blocked=round(sum(f['blocked_mbps'] for f in fs),3),shaped=round(sum(f['shaped'] for f in fs),3),healthy_links=sum(e['up'] for e in self.links.values()),peak_utilization=round(max(e['utilization'] for e in self.links.values())*100,2))
     def state(self):
         self.last_seen=time.time()
-        return dict(mode='deterministic_digital_twin',revision=self.rev,tick=self.tick,links=list(self.links.values()),hosts=HOSTS,flows=self.flows,rules=self.rules,metrics=self.metrics(),history=[{k:v for k,v in s.items() if k!='config'} for s in self.history],audit=list(self.audit),samples=list(self.samples),settings=dict(autoheal=self.autoheal,proactive=self.proactive,surge=self.surge),forecast_method='8-sample moving average + 5-step trend; not an LSTM',forecast_horizon=5)
+        return dict(mode='deterministic_digital_twin',revision=self.rev,tick=self.tick,links=list(self.links.values()),hosts=HOSTS,flows=self.flows,rules=self.rules,metrics=self.metrics(),history=[{k:v for k,v in s.items() if k!='config'} for s in self.history],audit=list(self.audit),samples=list(self.samples),settings=dict(autoheal=self.autoheal,proactive=self.proactive,surge=self.surge),forecast_method='8-sample moving average + 5-step trend; not an LSTM',forecast_horizon=5,incidents=list(self.incidents))
