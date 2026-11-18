@@ -11,7 +11,7 @@ Open **/troubleshoot** on the running app, or choose **Real capture & DNS tools*
 
 ### Privacy and safe operation
 
-Capture analysis sends no file or findings over the network, uses no AI, and stores no file in browser storage. Clear or close the tab to discard it. Only an explicit live DNS check sends the entered domain through AETHER to Google's fixed API endpoint. No arbitrary URL requests, router access, active scans or paid APIs. Resolver requests have a five-second timeout, 128 KB response cap, two concurrent slots, 12 upstream checks/minute globally and a 60-second cache. API endpoint: `GET /api/dns-check?name=example.com`.
+Local capture analysis sends no file or findings over the network, uses no AI, and stores no file in browser storage. The separately opt-in Gemini panel can send the ten displayed counts as described below. Clear or close the tab to discard it. Only an explicit live DNS check sends the entered domain through AETHER to Google's fixed API endpoint. No arbitrary URL requests, router access, active scans or paid APIs. Resolver requests have a five-second timeout, 128 KB response cap, two concurrent slots, 12 upstream checks/minute globally and a 60-second cache. API endpoint: `GET /api/dns-check?name=example.com`.
 
 Classic PCAP 2.4 only: both byte orders and microsecond/nanosecond timestamps; Ethernet (up to two VLAN tags), raw IPv4 and Linux cooked v1. Up to 20 MB and 100,000 records. No PCAPNG, IPv6 decoding, IP reassembly, TCP DNS reconstruction, TLS decryption or live capture. In Wireshark use File > Save As > classic pcap to convert PCAPNG. The built-in capture is visibly **synthetic**, not a real-world benchmark. Totals use capture original-byte metadata, not measured link capacity. Non-decoded traffic and shortened records are disclosed.
 
@@ -145,3 +145,14 @@ The proposal's real SDN/OpenFlow, OSPF comparison, trained LSTM, iperf/ping capt
 https://aether-network-twin.onrender.com/
 
 Deployment evidence, free-host limits and current model status: [docs/deployment.md](docs/deployment.md).
+
+
+## Evidence vs hypothesis: optional Gemini guided Q&A
+
+After loading a capture, review the exact ten parser-count fields in the AI panel. Opt in before each capture is sent. Four fixed question choices ask for explanation, alternatives, next manual checks, or limits. Only counts, a fixed coverage note and selected question go through the server to Google. No file, payload, addresses, names, aliases, filename or timestamps are transmitted. No arbitrary prompt or conversation history is accepted. This is guided Q&A, not free-text chat or speech.
+
+Responses separate possible explanations, evidence references, unknowns and next checks. The server rejects unknown evidence IDs and malformed response structures. This validates citation presence, not factual support or causal correctness. Counts are client-supplied parser observations, not independently authenticated measurements. AI can still be wrong. Output is text only; there are no model tools, commands or network mutations. A separate JSON download records the evidence and AI response; existing local reports remain independent.
+
+Uses the same server-side Gemini key, free-tier gate, daily counter, per-session eight-call limit and two-request concurrency cap as the lab translator. No paid fallback. Provider rate limits can be lower; restarts can reset the local SQLite counter on ephemeral hosting, so it is an abuse limiter, not a billing guarantee. Billing must remain disabled. Free-tier content may be used by Google to improve its products. Local capture analysis works without Google. Failures remain explicit, no substitute AI output.
+
+Design research: EvidenceLoop / Protocol SIFT Agent, https://github.com/irinaford/protocol-sift-agent . Evidence-grounded LLM reporting already exists; this integration is not claimed as a new invention. No code from that project was copied, no framework dependency added. Existing Ben Foxall MIT header-reader credit remains unchanged.
