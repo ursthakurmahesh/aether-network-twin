@@ -1,4 +1,41 @@
 # AETHER
+
+## New: practical troubleshooting tools (18 November 2026)
+
+Open **/troubleshoot** on the running app, or choose **Real capture & DNS tools** in the dashboard.
+
+- Open an authorized classic PCAP capture locally in your browser. Find observed UDP DNS failure codes, TCP reset flags and largest directional connections. Read the evidence, possible meaning and next checks. This is evidence triage, not automatic root-cause proof.
+- Download a redacted standalone HTML incident report or JSON. Exports omit IP addresses, queried names and filename; device aliases and ports remain. Review before sharing.
+- Run a real **Google Public DNS-over-HTTPS** A-record check for a public domain. Inspect the actual JSON response, including DNS status and addresses. This tests Google's resolver, not your local resolver, website reachability or Wi-Fi quality.
+- Keep the original simulation lab for hypothetical policy changes and fault recovery. Captures do not automatically construct its topology or configure real devices.
+
+### Privacy and safe operation
+
+Capture analysis sends no file or findings over the network, uses no AI, and stores no file in browser storage. Clear or close the tab to discard it. Only an explicit live DNS check sends the entered domain through AETHER to Google's fixed API endpoint. No arbitrary URL requests, router access, active scans or paid APIs. Resolver requests have a five-second timeout, 128 KB response cap, two concurrent slots, 12 upstream checks/minute globally and a 60-second cache. API endpoint: `GET /api/dns-check?name=example.com`.
+
+Classic PCAP 2.4 only: both byte orders and microsecond/nanosecond timestamps; Ethernet (up to two VLAN tags), raw IPv4 and Linux cooked v1. Up to 20 MB and 100,000 records. No PCAPNG, IPv6 decoding, IP reassembly, TCP DNS reconstruction, TLS decryption or live capture. In Wireshark use File > Save As > classic pcap to convert PCAPNG. The built-in capture is visibly **synthetic**, not a real-world benchmark. Totals use capture original-byte metadata, not measured link capacity. Non-decoded traffic and shortened records are disclosed.
+
+### Reproduce the checks
+
+```sh
+python -m unittest discover -s tests -v
+node tests/capture.test.js
+```
+
+The upgrade's local run passed 42 Python tests (32 existing plus 10 DNS tests) and 19 JavaScript capture tests. A Chromium walkthrough separately checked sample/file input, malformed rejection, clearing, redacted HTML/JSON downloads, no capture-analysis network requests, real DNS success/NXDOMAIN/invalid input, mobile layout and baseline connectivity. Tests are not a guarantee of production correctness. Windows has not been tested.
+
+### Sources and credit
+
+Capture header interpretation adapted from **Ben Foxall's pcap-decoder**, MIT license, pinned source commit `d77edf1248d5828ebf4f9924645e4c738623a9c5`. Full license is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). No npm runtime dependencies or remote scripts are bundled.
+
+- https://github.com/benfoxall/pcap-decoder
+- https://wiki.wireshark.org/Development/LibpcapFileFormat/
+- https://developers.google.com/speed/public-dns/docs/doh/json
+
+The remainder of this README documents the original simulation lab, not real-network control.
+
+---
+
 ### Intent-based network intelligence, with a safety gate before every change.
 
 A standalone full-stack educational **network digital twin**. Express a network objective, inspect the structured policy and dry-run estimate, approve it, inject a link fault, inspect rerouting, and restore a snapshot.
