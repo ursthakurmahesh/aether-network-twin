@@ -60,14 +60,14 @@ def gemini_pick_removal(text,session,rules):
     if DANGER.search(text):raise Problem('Unsafe instruction or management target rejected before model access.')
     if not rules:raise Problem('There are no approved rules to remove. Nothing was changed.')
     brief=json.dumps({'request':text,'rules':[{'number':i+1,**r} for i,r in enumerate(rules)]})
-    out=gemini_generate(brief,session,REMOVE_PROMPT,REMOVE_SCHEMA)
+    out=gemini_generate(brief,session,REMOVE_PROMPT,REMOVE_SCHEMA,FINDINGS_MODEL)
     nums=out.get('remove') if type(out) is dict else None
     if type(nums) is not list or not nums or len(nums)>12 or any(type(n) is not int or not 1<=n<=len(rules) for n in nums):raise Problem('Gemini could not match that to an approved rule. Say which rule, for example: unblock video. Nothing was changed.')
     return [n-1 for n in nums]
 
 def gemini_translate(text,session):
     if DANGER.search(text):raise Problem('Unsafe instruction or management target rejected before model access.')
-    bundle=gemini_generate(text,session)
+    bundle=gemini_generate(text,session,model=FINDINGS_MODEL)
     if not bundle.get('rules'):raise Problem('The model needs a clearer target or threshold. Nothing was applied.')
     return validate_schema(bundle)
 
@@ -144,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/metrics':
                 text='# AETHER metrics are modeled, not measured from packets. Visitor-scoped.\n'+'\n'.join('aether_model_'+k+' '+str(v) for k,v in t.metrics().items())+'\n'
                 return self.reply(text.encode(),mime='text/plain; charset=utf-8',cookie=cookie)
-            result=t.state();result.update(csrf=s['csrf'],llm={'available':LLM_ENABLED,'model':MODEL if LLM_ENABLED else None,'calls_remaining':max(0,8-s['llm_calls'])},notice='Synthetic digital twin only. No Mininet, physical network, real OpenFlow or LSTM measurements. Session expires after 30 idle minutes; hosted restarts erase sessions.')
+            result=t.state();result.update(csrf=s['csrf'],llm={'available':LLM_ENABLED,'model':FINDINGS_MODEL if LLM_ENABLED else None,'calls_remaining':max(0,8-s['llm_calls'])},notice='Synthetic digital twin only. No Mininet, physical network, real OpenFlow or LSTM measurements. Session expires after 30 idle minutes; hosted restarts erase sessions.')
             if path=='/api/export':result.pop('csrf');result.update(exported_at=time.time(),model_document='See docs/MODEL.md for equations and limits.')
             self.reply(result,cookie=cookie)
     def do_POST(self):
@@ -200,8 +200,8 @@ class Handler(BaseHTTPRequestHandler):
                         with t.lock:rules=copy.deepcopy(t.rules)
                         how='offline matcher'
                         try:idx=parse_removal(text,rules)
-                        except Problem:
-                            if source!='gemini':raise
+                        except Problem as e:
+                            if source!='gemini' or e.status==404:raise
                             idx=gemini_pick_removal(text,s,rules);how='Gemini selection'
                         with t.lock:result=t.propose_removal(idx,text,how)
                     else:
