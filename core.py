@@ -128,7 +128,7 @@ def parse_offline(text):
         rules.append(r)
     return validate_schema({'rules':rules})
 
-REMOVE_WORDS=re.compile(r'^\s*(unblock|un-block|remove|undo|lift|revoke|cancel|stop|unlimit|unprioriti[sz]e|clear)\b',re.I)
+REMOVE_WORDS=re.compile(r'^\s*(unblock|un-block|remove|undo|lift|revoke|cancel|stop|unlimit|unprioriti[sz]e|clear|get rid of|turn off|take off|disable)\b',re.I)
 def is_removal(text):return type(text) is str and bool(REMOVE_WORDS.match(text))
 def parse_removal(text,rules):
     """Deterministic removal: returns indexes of existing approved rules. Never invents or edits rules."""
@@ -140,7 +140,7 @@ def parse_removal(text,rules):
         nums=[int(n) for n in re.findall(r'\d+',m.group(1))]
         if any(not 1<=n<=len(rules) for n in nums):raise Problem('No such rule number. Open Policy registry to see rule numbers. Nothing was changed.')
         return [n-1 for n in nums]
-    verb=re.match(r'^\s*(unblock|un-block|remove|undo|lift|revoke|cancel|stop|unlimit|unprioriti[sz]e|clear)\b',c).group(1)
+    verb=re.match(r'^\s*(unblock|un-block|remove|undo|lift|revoke|cancel|stop|unlimit|unprioriti[sz]e|clear|get rid of|turn off|take off|disable)\b',c).group(1)
     rest=c[len(c)-len(c.lstrip()):] if False else re.sub(r'^\s*'+verb,'',c).strip()
     action={'unblock':'block','un-block':'block','unlimit':'rate_limit','unprioritize':'prioritize','unprioritise':'prioritize'}.get(verb)
     for a,words in (('block',r'\b(block|blocking|blocked|deny|drop)\b'),('rate_limit',r'\b(limit|cap|throttle|rate)\b'),('prioritize',r'\b(prioriti[sz]e|prioriti[sz]ing|priority)\b'),('reroute',r'\b(reroute|route)\b'),('latency',r'\blatency\b'),('allow',r'\b(allow|permit)\b')):
@@ -153,7 +153,7 @@ def parse_removal(text,rules):
     if re.search(r'bittorrent|peer.to.peer|p2p',rest):names=['p2p']
     if re.search(r'\bweb\b|https',rest):names=['web']
     if len(names)>1:raise Problem('Name one application per removal, for example: unblock video. Nothing was changed.')
-    if not action and verb in ('remove','undo','cancel','stop','lift','revoke','clear'):raise Problem('Say which kind of rule to remove, for example: unblock video, or remove rule 2. Nothing was changed.')
+    if not action and verb not in ('unblock','un-block','unlimit','unprioritize','unprioritise'):raise Problem('Say which kind of rule to remove, for example: unblock video, or remove rule 2. Nothing was changed.')
     if not hosts and not names:raise Problem('Name a host or application, for example: unblock video, or remove rule 2. Nothing was changed.')
     out=[]
     for i,r in enumerate(rules):
